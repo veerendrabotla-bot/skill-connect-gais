@@ -1,0 +1,23 @@
+
+{
+  "short_name": "SkillConnect",
+  "name": "SkillConnect Enterprise Service OS",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/fluency/144/checked-user-male.png",
+      "type": "image/png",
+      "sizes": "144x144"
+    },
+    {
+      "src": "https://img.icons8.com/fluency/512/checked-user-male.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "./",
+  "background_color": "#4F46E5",
+  "display": "standalone",
+  "scope": "./",
+  "theme_color": "#4F46E5",
+  "description": "Enterprise-grade blue-collar service marketplace."
+}
