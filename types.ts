@@ -5,6 +5,13 @@ export enum UserRole {
   ADMIN = 'ADMIN'
 }
 
+export enum AdminLevel {
+  SUPER_ADMIN = 'SUPER_ADMIN',   // The Architect: Full Access
+  OPS_MANAGER = 'OPS_MANAGER',   // The Business: Mesh, Agility, Safety
+  GROWTH_LEAD = 'GROWTH_LEAD',   // The Sales: Growth, Analytics
+  COMPLIANCE_OFFICER = 'COMPLIANCE_OFFICER' // The Judiciary: Workers, Disputes, Audit
+}
+
 export enum JobStatus {
   REQUESTED = 'REQUESTED',
   MATCHING = 'MATCHING',
@@ -22,6 +29,7 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
+  adminLevel?: AdminLevel;
   phone?: string;
   avatar?: string;
   verified: boolean;
@@ -67,6 +75,8 @@ export interface Job {
     items: { label: string; amount: number }[];
     total: number;
   };
+  // Fix: Added metadata property to Job interface to store dynamic dispatcher/AI data
+  metadata?: any;
 }
 
 export interface Worker {

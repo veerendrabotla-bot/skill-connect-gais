@@ -4,31 +4,30 @@
 These SQL functions act as the secure "Edge Functions" for the platform, enforcing role-based logic at the database kernel.
 
 ```sql
--- 1. Identity Middleware: Get full security context
+-- 1. Identity Middleware: Get full security context (Fixed version)
 CREATE OR REPLACE FUNCTION public.get_identity_context()
 RETURNS JSONB AS $$
 DECLARE
   v_user_id UUID := auth.uid();
-  v_profile RECORD;
-  v_worker RECORD;
   v_result JSONB;
 BEGIN
-  -- Fetch Profile
-  SELECT * INTO v_profile FROM public.profiles WHERE id = v_user_id;
-  
-  -- Fetch Worker details if applicable
-  IF v_profile.role = 'WORKER' THEN
-    SELECT * INTO v_worker FROM public.workers WHERE id = v_user_id;
-  END IF;
+  -- Use a single query with sub-selects to avoid "record not assigned" errors
+  SELECT 
+    jsonb_build_object(
+      'user', to_jsonb(p.*),
+      'is_verified', p.verified,
+      'role', p.role,
+      'worker_stats', (
+        SELECT to_jsonb(w.*) 
+        FROM public.workers w 
+        WHERE w.id = v_user_id
+      ),
+      'session_verified_at', now()
+    ) INTO v_result
+  FROM public.profiles p
+  WHERE p.id = v_user_id;
 
-  v_result := jsonb_build_object(
-    'user', to_jsonb(v_profile),
-    'is_verified', v_profile.verified,
-    'role', v_profile.role,
-    'worker_stats', CASE WHEN v_worker.id IS NOT NULL THEN to_jsonb(v_worker) ELSE NULL END,
-    'session_verified_at', now()
-  );
-
+  -- Return null if no profile exists yet (race condition handler)
   RETURN v_result;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

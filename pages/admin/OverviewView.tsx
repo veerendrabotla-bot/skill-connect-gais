@@ -1,69 +1,105 @@
-
 import React, { useState, useEffect } from 'react';
-import { auditService, AuditLog } from '../../services/auditService';
+import { adminService, ForensicLog } from '../../services/adminService';
 import { 
   Terminal, History, ExternalLink, 
-  AlertTriangle, ShieldCheck, Zap, Loader2
+  AlertTriangle, ShieldCheck, Zap, Loader2,
+  RefreshCcw, Database
 } from 'lucide-react';
 
 const OverviewView: React.FC = () => {
-  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [logs, setLogs] = useState<ForensicLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [schemaError, setSchemaError] = useState(false);
 
   useEffect(() => {
-    const loadLogs = async () => {
-      try {
-        const data = await auditService.getRecentLogs(12);
-        setLogs(data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadLogs();
+
+    // Bind to the Forensic Audit Stream
+    const subscription = adminService.subscribeToTable('audit_logs', () => {
+      console.debug("Intelligence Feed Updated: Resyncing Pulse...");
+      loadLogs();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
+
+  const loadLogs = async () => {
+    try {
+      const data = await adminService.getForensicLogs();
+      setLogs(data.slice(0, 12)); // Limit to most recent for pulse view
+      setSchemaError(false);
+    } catch (err: any) {
+      console.error("Forensic Sync Failure:", err);
+      // PGRST205 means view/table missing from schema cache
+      if (err.code === 'PGRST205' || err.message?.includes('admin_forensic_audit_view')) {
+        setSchemaError(true);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
       
       {/* Intelligence Pulse: System Audit Trail */}
       <div className="lg:col-span-8 space-y-8">
-         <div className="bg-white p-10 sm:p-14 rounded-[4rem] border border-gray-100 shadow-sm space-y-10">
+         <div className="bg-white p-10 sm:p-14 rounded-[4rem] border border-gray-100 shadow-sm space-y-10 min-h-[400px]">
             <div className="flex items-center justify-between">
                <div className="space-y-1">
                   <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Intelligence Pulse</h3>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Real-time mutation monitoring</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Real-time forensic mutation monitoring</p>
                </div>
-               <div className="flex items-center gap-3">
-                  <span className="w-2 h-2 bg-indigo-600 rounded-full animate-ping"></span>
-                  <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Live Stream</span>
+               <div className="flex items-center gap-4">
+                  {!schemaError && (
+                    <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 rounded-lg">
+                      <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-ping"></span>
+                      <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">Live Stream Active</span>
+                    </div>
+                  )}
+                  <button onClick={loadLogs} className="p-2 text-gray-300 hover:text-indigo-600 transition-all">
+                    <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} />
+                  </button>
                </div>
             </div>
 
-            <div className="space-y-6">
-               {loading ? (
+            <div className="space-y-4">
+               {loading && logs.length === 0 ? (
                  <div className="py-20 flex flex-col items-center gap-4 text-gray-400">
                     <Loader2 className="animate-spin" size={32} />
                     <p className="text-[10px] font-black uppercase tracking-[0.3em]">Decrypting Ledger...</p>
                  </div>
+               ) : schemaError ? (
+                 <div className="py-20 text-center flex flex-col items-center gap-6 animate-in zoom-in">
+                    <div className="w-20 h-20 bg-orange-50 rounded-[2.5rem] flex items-center justify-center text-orange-600">
+                       <Database size={40} />
+                    </div>
+                    <div className="space-y-2 max-w-md">
+                       <h4 className="text-xl font-black text-gray-900 uppercase tracking-tight">Schema Sync Required</h4>
+                       <p className="text-xs text-gray-500 font-bold leading-relaxed">
+                         The forensic audit views (Phase 5.6) have not been established in the Postgres kernel. Run the Audit & Compliance SQL scripts to enable this stream.
+                       </p>
+                    </div>
+                 </div>
                ) : logs.length > 0 ? logs.map(log => (
-                 <div key={log.id} className="flex items-center justify-between p-6 bg-gray-50/50 rounded-3xl border border-gray-100 hover:border-indigo-200 transition-all group cursor-default">
+                 <div key={log.id} className="flex items-center justify-between p-6 bg-gray-50/40 rounded-3xl border border-gray-100 hover:border-indigo-200 transition-all group cursor-default animate-in fade-in slide-in-from-left-2">
                     <div className="flex items-center gap-6">
-                       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg ${
-                         log.action === 'INSERT' ? 'bg-green-500 shadow-green-100' : 
-                         log.action === 'UPDATE' ? 'bg-blue-500 shadow-blue-100' : 
+                       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg ${
+                         log.action === 'INSERT' ? 'bg-emerald-500 shadow-emerald-100' : 
+                         log.action.includes('UPDATE') ? 'bg-blue-500 shadow-blue-100' : 
                          'bg-red-500 shadow-red-100'
                        }`}>
-                          <Terminal size={24} />
+                          <Terminal size={20} />
                        </div>
                        <div>
                           <p className="text-sm font-black text-gray-900 uppercase tracking-tight">
-                             {(log as any).actor?.full_name || 'System Auto'} 
+                             {log.actor_name || 'System Auto'} 
                              <span className="text-gray-400 font-bold ml-2">modified {log.entity_type}</span>
                           </p>
                           <div className="flex items-center gap-3 mt-1">
-                             <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest font-mono">NODE_REF: #{log.entity_id.slice(0, 12)}</p>
+                             <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest font-mono">ID: #{log.entity_id.slice(0, 8)}</p>
                              <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
                              <p className="text-[10px] text-gray-300 font-black uppercase tracking-widest">{new Date(log.created_at).toLocaleTimeString()}</p>
                           </div>
@@ -81,9 +117,11 @@ const OverviewView: React.FC = () => {
                )}
             </div>
 
-            <button className="w-full py-5 border-2 border-dashed border-gray-100 text-gray-400 rounded-3xl font-black text-[10px] uppercase tracking-[0.3em] hover:border-indigo-600 hover:text-indigo-600 transition-all">
-               Mount Full Audit Archive
-            </button>
+            {!schemaError && (
+              <button className="w-full py-5 border-2 border-dashed border-gray-100 text-gray-400 rounded-3xl font-black text-[10px] uppercase tracking-[0.3em] hover:border-indigo-600 hover:text-indigo-600 transition-all">
+                Mount Full Audit Archive
+              </button>
+            )}
          </div>
       </div>
 
@@ -116,18 +154,15 @@ const OverviewView: React.FC = () => {
             </div>
          </div>
 
-         <div className="bg-red-50 p-10 rounded-[3.5rem] border border-red-100 space-y-6">
+         <div className="bg-red-50 p-10 rounded-[3.5rem] border border-red-100 space-y-6 shadow-sm">
             <div className="flex items-center gap-3 text-red-600 font-black text-[10px] uppercase tracking-widest">
                <AlertTriangle size={20} /> Anomaly Detection
             </div>
             <div className="space-y-4">
                <div className="bg-white p-5 rounded-2xl border border-red-50 shadow-sm">
-                  <p className="text-[10px] font-black text-gray-900 uppercase tracking-tight">Stuck Deployment Detected</p>
-                  <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">NODE_ID: #ae821 • Status: IN_TRANSIT (4h+)</p>
+                  <p className="text-[10px] font-black text-gray-900 uppercase tracking-tight text-red-600">Cognitive Alert</p>
+                  <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Platform v4.2 Diagnostic: Node parity stable. No critical blockers detected.</p>
                </div>
-               <button className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-red-100 hover:bg-black transition-all">
-                  Initialize Intervention
-               </button>
             </div>
          </div>
 
@@ -137,10 +172,10 @@ const OverviewView: React.FC = () => {
                <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
                   <ShieldCheck size={24} />
                </div>
-               <h4 className="text-lg font-black tracking-tight uppercase">Governance Note</h4>
+               <h4 className="text-lg font-black tracking-tight uppercase">Governance Integrity</h4>
             </div>
             <p className="text-xs text-indigo-300 font-medium leading-relaxed italic relative z-10">
-               "All administrative actions are logged to the immutable ledger. Misuse of the intervention protocol will trigger an automatic security audit."
+               "This console provides root access to the platform mesh. Every administrative query is signed and stored in the forensic vault for regulatory auditing."
             </p>
          </div>
 

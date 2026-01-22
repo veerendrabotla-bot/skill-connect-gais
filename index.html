@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -115,13 +114,22 @@
     <!-- Mapping: Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
-      // Register Service Worker
-      if ('serviceWorker' in navigator) {
+      // Register Service Worker with absolute relative path and improved origin checking
+      // This solves the 'https://ai.studio' origin mismatch in cloud sandbox environments
+      const isSandbox = window.location.hostname.includes('usercontent.goog') || window.location.hostname.includes('webcontainer.io');
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+      if ('serviceWorker' in navigator && !isSandbox && !isLocal) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js')
+          navigator.serviceWorker.register('/sw.js', { scope: '/' })
             .then(reg => console.log('Service Worker Active:', reg.scope))
-            .catch(err => console.log('SW Registration Failure:', err));
+            .catch(err => {
+              // Graceful failure for SW - doesn't impact app functionality
+              console.warn('SW Registration Bypassed (Env/Origin Constraint)');
+            });
         });
+      } else {
+        console.log('SW Registration Skipped: Sandbox/Local Environment detected');
       }
     </script>
   </body>

@@ -20,7 +20,8 @@ const mapJob = (d: any): Job => {
     updatedAt: d.updated_at,
     price: parseFloat(d.price),
     distance: d.distance_meters,
-    invoiceDetails: d.invoice_details
+    invoiceDetails: d.invoice_details,
+    metadata: d.metadata
   };
 };
 
@@ -47,9 +48,6 @@ export const jobService = {
     return (data || []).map(mapJob);
   },
 
-  /**
-   * Real-time subscription to any job the user is a participant of.
-   */
   subscribeToMyJobs(userId: string, onUpdate: (job: Job) => void) {
     return supabase
       .channel(`user-jobs-${userId}`)
@@ -96,9 +94,6 @@ export const jobService = {
     return (data || []).map(mapJob);
   },
 
-  /**
-   * Real-time subscription to new requests for workers.
-   */
   subscribeToAvailableLeads(onNewLead: (job: Job) => void) {
     return supabase
       .channel('public-leads')
@@ -146,6 +141,31 @@ export const jobService = {
     
     if (fetchError) throw fetchError;
     return mapJob(jobData);
+  },
+
+  async runDispatcher(jobId: string) {
+    const { data, error } = await supabase.rpc('auto_dispatch_job', { p_job_id: jobId });
+    if (error) throw error;
+    return data;
+  },
+
+  async applyPromotion(code: string, customerId: string) {
+    const { data, error } = await supabase.rpc('apply_promotion_code', {
+      p_code: code,
+      p_customer_id: customerId
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async triggerSOS(jobId: string, lat: number, lng: number) {
+    const { data, error } = await supabase.rpc('trigger_sos', {
+      p_job_id: jobId,
+      p_lat: lat,
+      p_lng: lng
+    });
+    if (error) throw error;
+    return data;
   },
 
   async initializeTransit(jobId: string, workerId: string): Promise<boolean> {
@@ -209,14 +229,15 @@ export const jobService = {
     return data;
   },
 
-  async submitDispute(jobId: string, reporterId: string, category: string, reason: string): Promise<string> {
-    const { data, error } = await supabase.rpc('submit_dispute', {
-      p_job_id: jobId,
-      p_reporter_id: reporterId,
-      p_category: category,
-      p_reason: reason
+  async submitDispute(jobId: string, reporterId: string, category: string, reason: string): Promise<void> {
+    const { error } = await supabase.from('disputes').insert({
+      job_id: jobId,
+      reporter_id: reporterId,
+      category,
+      reason,
+      status: 'OPEN'
     });
     if (error) throw error;
-    return data;
+    await jobService.updateJobStatus(jobId, JobStatus.DISPUTED);
   }
 };

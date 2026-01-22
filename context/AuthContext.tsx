@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { User, UserRole } from '../types';
+import { User, UserRole, AdminLevel } from '../types';
 import { identityService } from '../services/identityService';
 import { authService } from '../services/authService';
 import { supabase } from '../lib/supabase';
@@ -16,6 +16,7 @@ interface AuthContextType {
   isCustomer: boolean;
   isWorker: boolean;
   isAdmin: boolean;
+  adminLevel: AdminLevel | null;
   isVerified: boolean;
   
   logout: () => Promise<void>;
@@ -44,14 +45,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setNeedsEmailVerification(false);
       
-      // Step 2.4: Attempt to fetch context with retry for network resilience
       const context = await identityService.getFullContext();
       
+      if (!context || !context.user) {
+         console.warn("Identity context empty, profile might be initializing.");
+         return;
+      }
+
       setUser({
         id: context.user.id,
         email: context.user.email,
         name: context.user.full_name,
         role: context.user.role as UserRole,
+        adminLevel: context.admin_level as AdminLevel,
         verified: context.user.verified,
         avatar: context.user.avatar_url,
         phone: context.user.phone
@@ -61,16 +67,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setWorkerStats(context.worker_stats);
       }
       
-      retryCount.current = 0; // Reset on success
+      retryCount.current = 0;
 
     } catch (err) {
       console.error("Identity sync attempt failed:", err);
       
-      // Network loss recovery logic: Retry up to 3 times with backoff
       if (retryCount.current < 3) {
         retryCount.current++;
         const backoff = retryCount.current * 1000;
-        console.warn(`Retrying identity sync in ${backoff}ms...`);
         setTimeout(() => fetchAndSetProfile(uid, sessionUser), backoff);
         return;
       }
@@ -83,7 +87,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Initial Session Check
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         fetchAndSetProfile(session.user.id, session.user);
@@ -93,7 +96,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    // Real-time Auth State Monitoring
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.debug(`Auth Event Detected: ${event}`);
       
@@ -128,6 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isCustomer = user?.role === UserRole.CUSTOMER;
   const isWorker = user?.role === UserRole.WORKER;
   const isAdmin = user?.role === UserRole.ADMIN;
+  const adminLevel = user?.adminLevel || null;
   const isVerified = user?.verified === true;
 
   return (
@@ -140,6 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isCustomer,
       isWorker,
       isAdmin,
+      adminLevel,
       isVerified,
       logout, 
       refreshProfile 

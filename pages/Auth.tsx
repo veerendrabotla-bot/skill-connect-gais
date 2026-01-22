@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { authService } from '../services/authService';
 import { UserRole } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { Loader2, Mail, Lock, User as UserIcon, ShieldCheck, ShoppingBag, UserCheck, ArrowRight, CheckCircle, RefreshCcw } from 'lucide-react';
+import { Loader2, Mail, Lock, User as UserIcon, ShieldCheck, ShoppingBag, UserCheck, ArrowRight, CheckCircle, RefreshCcw, ShieldAlert } from 'lucide-react';
 
 const AuthPage: React.FC = () => {
   const { needsEmailVerification, logout } = useAuth();
@@ -39,7 +39,6 @@ const AuthPage: React.FC = () => {
     }
   };
 
-  // 2.1 Verification Gate UI
   if (needsEmailVerification) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-[#F8FAFC]">
@@ -74,17 +73,17 @@ const AuthPage: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[#F8FAFC]">
-      <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-12 gap-0 bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-gray-100">
+      <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-12 gap-0 bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-gray-100">
         
         {/* Left Side: Illustration & Branding */}
-        <div className="lg:col-span-5 bg-blue-600 p-12 text-white flex flex-col justify-between relative overflow-hidden">
+        <div className="lg:col-span-5 bg-indigo-600 p-12 text-white flex flex-col justify-between relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-400/20 rounded-full -ml-32 -mb-32 blur-3xl"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-400/20 rounded-full -ml-32 -mb-32 blur-3xl"></div>
           
           <div className="relative z-10">
-            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-blue-600 font-black text-2xl mb-8 shadow-lg">S</div>
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 font-black text-2xl mb-8 shadow-lg">S</div>
             <h1 className="text-4xl font-black tracking-tighter mb-4">SkillConnect</h1>
-            <p className="text-blue-100 text-lg font-medium leading-relaxed">
+            <p className="text-indigo-100 text-lg font-medium leading-relaxed">
               Empowering the world's workforce with enterprise-grade service infrastructure.
             </p>
           </div>
@@ -96,7 +95,7 @@ const AuthPage: React.FC = () => {
               </div>
               <div>
                 <p className="font-bold">Verified Partners</p>
-                <p className="text-sm text-blue-100">100% background checked professionals.</p>
+                <p className="text-sm text-indigo-100">100% background checked professionals.</p>
               </div>
             </div>
             <div className="flex items-center gap-4 group cursor-default">
@@ -105,7 +104,7 @@ const AuthPage: React.FC = () => {
               </div>
               <div>
                 <p className="font-bold">Seamless Payments</p>
-                <p className="text-sm text-blue-100">Enterprise escrow and instant settlements.</p>
+                <p className="text-sm text-indigo-100">Enterprise escrow and instant settlements.</p>
               </div>
             </div>
           </div>
@@ -119,7 +118,7 @@ const AuthPage: React.FC = () => {
                 {isLogin ? "Welcome back" : "Create an account"}
               </h2>
               <p className="text-gray-500 font-medium">
-                {isLogin ? "Enter your credentials to access your dashboard." : "Join our network of elite service professionals and customers."}
+                {isLogin ? "Enter your credentials to access your dashboard." : "Join our network of elite professionals."}
               </p>
             </div>
 
@@ -127,7 +126,7 @@ const AuthPage: React.FC = () => {
               {!isLogin && (
                 <>
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Full Name</label>
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
                     <div className="relative">
                       <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                       <input 
@@ -135,34 +134,44 @@ const AuthPage: React.FC = () => {
                         placeholder="John Doe"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-blue-600 rounded-2xl outline-none transition-all font-semibold text-gray-900 placeholder:text-gray-300"
+                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-indigo-600 rounded-2xl outline-none transition-all font-semibold text-gray-900 placeholder:text-gray-300 shadow-inner"
                         required
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Select Your Role</label>
-                    <div className="grid grid-cols-2 gap-4">
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Identity Role</label>
+                    <div className="grid grid-cols-3 gap-3">
                       <button
                         type="button"
                         onClick={() => setRole(UserRole.CUSTOMER)}
                         className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
-                          role === UserRole.CUSTOMER ? 'border-blue-600 bg-blue-50' : 'border-gray-100 bg-gray-50'
+                          role === UserRole.CUSTOMER ? 'border-indigo-600 bg-indigo-50 shadow-md' : 'border-gray-100 bg-gray-50 text-gray-400'
                         }`}
                       >
-                        <UserCheck size={20} className={role === UserRole.CUSTOMER ? 'text-blue-600' : 'text-gray-400'} />
-                        <span className={`text-xs font-black uppercase ${role === UserRole.CUSTOMER ? 'text-blue-600' : 'text-gray-400'}`}>Customer</span>
+                        <UserCheck size={18} className={role === UserRole.CUSTOMER ? 'text-indigo-600' : ''} />
+                        <span className="text-[9px] font-black uppercase">Customer</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setRole(UserRole.WORKER)}
                         className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
-                          role === UserRole.WORKER ? 'border-blue-600 bg-blue-50' : 'border-gray-100 bg-gray-50'
+                          role === UserRole.WORKER ? 'border-indigo-600 bg-indigo-50 shadow-md' : 'border-gray-100 bg-gray-50 text-gray-400'
                         }`}
                       >
-                        <UserCheck size={20} className={role === UserRole.WORKER ? 'text-blue-600' : 'text-gray-400'} />
-                        <span className={`text-xs font-black uppercase ${role === UserRole.WORKER ? 'text-blue-600' : 'text-gray-400'}`}>Worker</span>
+                        <ShoppingBag size={18} className={role === UserRole.WORKER ? 'text-indigo-600' : ''} />
+                        <span className="text-[9px] font-black uppercase">Worker</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRole(UserRole.ADMIN)}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
+                          role === UserRole.ADMIN ? 'border-red-600 bg-red-50 shadow-md' : 'border-gray-100 bg-gray-50 text-gray-400'
+                        }`}
+                      >
+                        <ShieldAlert size={18} className={role === UserRole.ADMIN ? 'text-red-600' : ''} />
+                        <span className="text-[9px] font-black uppercase">Admin</span>
                       </button>
                     </div>
                   </div>
@@ -170,7 +179,7 @@ const AuthPage: React.FC = () => {
               )}
 
               <div className="space-y-2">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Email Address</label>
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Email Address</label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                   <input 
@@ -178,14 +187,14 @@ const AuthPage: React.FC = () => {
                     placeholder="name@company.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-blue-600 rounded-2xl outline-none transition-all font-semibold text-gray-900 placeholder:text-gray-300"
+                    className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-indigo-600 rounded-2xl outline-none transition-all font-semibold text-gray-900 placeholder:text-gray-300 shadow-inner"
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Password</label>
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Password</label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                   <input 
@@ -193,7 +202,7 @@ const AuthPage: React.FC = () => {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-blue-600 rounded-2xl outline-none transition-all font-semibold text-gray-900 placeholder:text-gray-300"
+                    className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-indigo-600 rounded-2xl outline-none transition-all font-semibold text-gray-900 placeholder:text-gray-300 shadow-inner"
                     required
                   />
                 </div>
@@ -211,9 +220,11 @@ const AuthPage: React.FC = () => {
               <button 
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 text-white ${
+                  role === UserRole.ADMIN && !isLogin ? 'bg-red-600 shadow-red-100 hover:bg-red-700' : 'bg-indigo-600 shadow-indigo-100 hover:bg-indigo-700'
+                }`}
               >
-                {isSubmitting ? <Loader2 className="animate-spin" /> : (isLogin ? "Sign In" : "Create Account")}
+                {isSubmitting ? <Loader2 className="animate-spin" /> : (isLogin ? "Sign In" : "Initialize Account")}
                 {!isSubmitting && <ArrowRight size={20} />}
               </button>
             </form>
@@ -221,9 +232,9 @@ const AuthPage: React.FC = () => {
             <div className="text-center">
               <button 
                 onClick={() => { setIsLogin(!isLogin); setMessage(null); }}
-                className="text-sm font-bold text-gray-500 hover:text-blue-600 transition-colors"
+                className="text-sm font-bold text-gray-500 hover:text-indigo-600 transition-colors"
               >
-                {isLogin ? "Don't have an account? Register" : "Already have an account? Sign in"}
+                {isLogin ? "Request New Node Access" : "Already have credentials? Sign in"}
               </button>
             </div>
           </div>

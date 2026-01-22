@@ -1,108 +1,63 @@
 
-# Phase 1.3: Database Functions and RPCs
+# Phase 1.3: Database Functions and RPCs (Atomic Operations)
 
 ```sql
--- 1. RPC: Atomic Job Request (Implemented previously)
--- 2. RPC: Secure Job Claim (Implemented previously)
--- 3. RPC: OTP Verification & Job Start (Implemented previously)
+-- 1. RPC: Atomic Job Request
+CREATE OR REPLACE FUNCTION public.request_job(
+  p_customer_id UUID,
+  p_category_id UUID,
+  p_description TEXT,
+  p_price NUMERIC,
+  p_address TEXT,
+  p_lat NUMERIC,
+  p_lng NUMERIC
+) RETURNS UUID AS $$
+DECLARE
+  v_job_id UUID;
+BEGIN
+  INSERT INTO public.jobs (customer_id, category_id, description, price, location_address, location_lat, location_lng, status)
+  VALUES (p_customer_id, p_category_id, p_description, p_price, p_address, p_lat, p_lng, 'REQUESTED')
+  RETURNING id INTO v_job_id;
 
--- 4. RPC: Unified State Transition Validator
--- Ensures that the state machine is followed strictly on the server.
-CREATE OR REPLACE FUNCTION public.update_job_state(
+  INSERT INTO public.job_events (job_id, actor_id, to_status, metadata)
+  VALUES (v_job_id, p_customer_id, 'REQUESTED', jsonb_build_object('source', 'WEB_APP'));
+
+  RETURN v_job_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 2. RPC: Atomic Secure Job Claim
+-- Prevents race conditions where two workers try to claim the same lead.
+CREATE OR REPLACE FUNCTION public.claim_job(
   p_job_id UUID,
-  p_next_status TEXT,
-  p_actor_id UUID
+  p_worker_id UUID
 ) RETURNS BOOLEAN AS $$
 DECLARE
   v_current_status TEXT;
-  v_is_valid BOOLEAN := FALSE;
 BEGIN
-  SELECT status INTO v_current_status FROM public.jobs WHERE id = p_job_id FOR UPDATE;
+  -- 1. Attempt to lock the specific job row for update
+  -- If it's already being updated or locked, this will wait or fail
+  SELECT status INTO v_current_status 
+  FROM public.jobs 
+  WHERE id = p_job_id 
+  FOR UPDATE;
 
-  -- State Machine Logic
-  IF v_current_status = 'REQUESTED' AND p_next_status IN ('MATCHING', 'CANCELLED') THEN v_is_valid := TRUE;
-  ELSIF v_current_status = 'MATCHING' AND p_next_status IN ('ASSIGNED', 'REQUESTED', 'CANCELLED') THEN v_is_valid := TRUE;
-  ELSIF v_current_status = 'ASSIGNED' AND p_next_status IN ('IN_TRANSIT', 'CANCELLED') THEN v_is_valid := TRUE;
-  ELSIF v_current_status = 'IN_TRANSIT' AND p_next_status IN ('STARTED', 'CANCELLED') THEN v_is_valid := TRUE;
-  ELSIF v_current_status = 'STARTED' AND p_next_status IN ('COMPLETED_PENDING_PAYMENT', 'DISPUTED') THEN v_is_valid := TRUE;
-  ELSIF v_current_status = 'COMPLETED_PENDING_PAYMENT' AND p_next_status IN ('PAID', 'DISPUTED') THEN v_is_valid := TRUE;
-  ELSIF v_current_status = 'DISPUTED' AND p_next_status IN ('PAID', 'CANCELLED') THEN v_is_valid := TRUE;
-  END IF;
-
-  IF NOT v_is_valid THEN
+  -- 2. Validate that the job is still available
+  IF v_current_status != 'REQUESTED' AND v_current_status != 'MATCHING' THEN
     RETURN FALSE;
   END IF;
 
+  -- 3. Atomically assign and update status
   UPDATE public.jobs
   SET 
-    status = p_next_status,
+    worker_id = p_worker_id,
+    status = 'ASSIGNED',
     updated_at = now()
   WHERE id = p_job_id;
 
-  RETURN TRUE;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 5. RPC: Submit Worker Application
-CREATE OR REPLACE FUNCTION public.submit_worker_application(
-  p_worker_id UUID,
-  p_skills TEXT[],
-  p_summary TEXT
-) RETURNS UUID AS $$
-DECLARE
-  v_app_id UUID;
-BEGIN
-  INSERT INTO public.workers_applications (worker_id, skills, experience_summary, status)
-  VALUES (p_worker_id, p_skills, p_summary, 'PENDING')
-  RETURNING id INTO v_app_id;
-  
-  RETURN v_app_id;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 6. RPC: Approve Worker Application
-CREATE OR REPLACE FUNCTION public.approve_worker_application(
-  p_app_id UUID,
-  p_admin_id UUID,
-  p_reason TEXT
-) RETURNS BOOLEAN AS $$
-DECLARE
-  v_worker_id UUID;
-  v_skills TEXT[];
-BEGIN
-  -- Verify admin role
-  IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = p_admin_id AND role = 'ADMIN') THEN
-    RAISE EXCEPTION 'Unauthorized';
-  END IF;
-
-  SELECT worker_id, skills INTO v_worker_id, v_skills 
-  FROM public.workers_applications 
-  WHERE id = p_app_id AND status = 'PENDING'
-  FOR UPDATE;
-
-  IF v_worker_id IS NULL THEN
-    RETURN FALSE;
-  END IF;
-
-  -- 1. Update Application Status
-  UPDATE public.workers_applications
-  SET status = 'APPROVED', admin_reason = p_reason
-  WHERE id = p_app_id;
-
-  -- 2. Update Worker Table
-  UPDATE public.workers
-  SET admin_approved = TRUE, skills = v_skills
-  WHERE id = v_worker_id;
-
-  -- 3. Update Profile Verification
-  UPDATE public.profiles
-  SET verified = TRUE
-  WHERE id = v_worker_id;
-
-  -- 4. Initialize Wallet
-  INSERT INTO public.wallets (id, balance)
-  VALUES (v_worker_id, 0)
-  ON CONFLICT DO NOTHING;
+  -- 4. Log the assignment event
+  INSERT INTO public.job_events (job_id, actor_id, from_status, to_status)
+  VALUES (p_job_id, p_worker_id, v_current_status, 'ASSIGNED');
 
   RETURN TRUE;
 END;

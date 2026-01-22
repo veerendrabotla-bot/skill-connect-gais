@@ -3,6 +3,7 @@
   "description": "A comprehensive blue-collar service marketplace connecting skilled workers with customers, featuring a robust job state machine, real-time tracking, and AI-powered service diagnostics.",
   "requestFramePermissions": [
     "geolocation",
-    "camera"
+    "camera",
+    "microphone"
   ]
 }
